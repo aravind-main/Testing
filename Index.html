@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ProjectHub</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+</head>
+<body>
+
+<h1>ProjectHub</h1>
+
+<script>
+const SUPABASE_URL = "https://cdzmhgvhqrrgrjbxsncj.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkem1oZ3ZocXJyZ3JqYnhzbmNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTAwMjEsImV4cCI6MjA5MDE2NjAyMX0.3d6qERFE0RQw25EyPdaOhga1rF3aREPxBumPWjThewE";
+
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Example: fetch projects
+async function loadProjects() {
+  const { data, error } = await supabase.from("projects").select("*");
+  console.log(data);
+}
+
+loadProjects();
+</script>
+
+</body>
+</html>
