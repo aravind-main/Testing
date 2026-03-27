@@ -1,54 +1,86 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ProjectHub</title>
+  <title>ProjectHub Pro</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
   <style>
-    body { font-family: Arial; background:#f5f6fa; }
-    h1 { margin:20px; }
-
-    .container { padding:20px; }
-
-    .card {
-      background:white;
-      padding:15px;
-      margin-bottom:10px;
-      border-radius:8px;
-      box-shadow:0 2px 6px rgba(0,0,0,0.1);
+    body {
+      font-family: Arial;
+      background: #f5f6fa;
+      margin: 0;
     }
 
-    .btn {
-      padding:10px 15px;
-      background:#4f6ef7;
-      color:white;
-      border:none;
-      border-radius:5px;
-      cursor:pointer;
-      margin-bottom:15px;
+    header {
+      background: #4f6ef7;
+      color: white;
+      padding: 15px 25px;
+      font-size: 20px;
+      font-weight: bold;
     }
 
-    input, select {
-      padding:8px;
-      margin:5px;
+    .container {
+      padding: 20px;
+      max-width: 900px;
+      margin: auto;
     }
 
     .form {
-      margin-bottom:20px;
-      background:white;
-      padding:15px;
-      border-radius:8px;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    input, select {
+      padding: 8px;
+    }
+
+    button {
+      padding: 8px 12px;
+      border: none;
+      background: #4f6ef7;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .delete {
+      background: red;
+    }
+
+    .status {
+      font-weight: bold;
     }
   </style>
 </head>
+
 <body>
 
-<h1>🚀 ProjectHub</h1>
+<header>🚀 ProjectHub Pro</header>
 
 <div class="container">
 
-  <!-- FORM -->
+  <!-- ADD FORM -->
   <div class="form">
-    <input id="name" placeholder="Project Name" />
+    <input id="name" placeholder="Project Name">
     <select id="status">
       <option>Planning</option>
       <option>Active</option>
@@ -60,11 +92,10 @@
       <option>Medium</option>
       <option>Low</option>
     </select>
-    <input id="progress" type="number" placeholder="Progress %" />
-    <button class="btn" onclick="addProject()">Add Project</button>
+    <input id="progress" type="number" placeholder="Progress %">
+    <button onclick="addProject()">Add</button>
   </div>
 
-  <!-- PROJECT LIST -->
   <div id="projects"></div>
 
 </div>
@@ -73,26 +104,17 @@
 const SUPABASE_URL = "https://cdzmhgvhqrrgrjbxsncj.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkem1oZ3ZocXJyZ3JqYnhzbmNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTAwMjEsImV4cCI6MjA5MDE2NjAyMX0.3d6qERFE0RQw25EyPdaOhga1rF3aREPxBumPWjThewE";
 
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let projects = [];
 
 async function fetchProjects() {
-  const { data, error } = await supabaseClient
-    .from("projects")
-    .select("*")
-    .order("id", { ascending: true });
-
-  if (error) {
-    console.error(error);
-    return;
-  }
-
+  const { data } = await db.from("projects").select("*").order("id");
   projects = data;
-  renderProjects();
+  render();
 }
 
-function renderProjects() {
+function render() {
   const container = document.getElementById("projects");
   container.innerHTML = "";
 
@@ -102,9 +124,21 @@ function renderProjects() {
 
     div.innerHTML = `
       <h3>${p.name}</h3>
-      <p>Status: ${p.status}</p>
+      <p>Status: 
+        <select onchange="updateStatus(${p.id}, this.value)">
+          <option ${p.status==="Planning"?"selected":""}>Planning</option>
+          <option ${p.status==="Active"?"selected":""}>Active</option>
+          <option ${p.status==="Review"?"selected":""}>Review</option>
+          <option ${p.status==="Blocked"?"selected":""}>Blocked</option>
+        </select>
+      </p>
       <p>Priority: ${p.priority}</p>
       <p>Progress: ${p.progress}%</p>
+
+      <div class="actions">
+        <button onclick="editProject(${p.id})">Edit</button>
+        <button class="delete" onclick="deleteProject(${p.id})">Delete</button>
+      </div>
     `;
 
     container.appendChild(div);
@@ -117,24 +151,28 @@ async function addProject() {
   const priority = document.getElementById("priority").value;
   const progress = parseInt(document.getElementById("progress").value) || 0;
 
-  if (!name) {
-    alert("Enter project name");
-    return;
-  }
+  if (!name) return alert("Enter name");
 
-  const { error } = await supabaseClient.from("projects").insert([
-    { name, status, priority, progress }
-  ]);
+  await db.from("projects").insert([{ name, status, priority, progress }]);
 
-  if (error) {
-    console.error(error);
-    alert("Error saving");
-    return;
-  }
+  fetchProjects();
+}
 
-  document.getElementById("name").value = "";
-  document.getElementById("progress").value = "";
+async function deleteProject(id) {
+  await db.from("projects").delete().eq("id", id);
+  fetchProjects();
+}
 
+async function updateStatus(id, status) {
+  await db.from("projects").update({ status }).eq("id", id);
+  fetchProjects();
+}
+
+async function editProject(id) {
+  const newName = prompt("Enter new name:");
+  if (!newName) return;
+
+  await db.from("projects").update({ name: newName }).eq("id", id);
   fetchProjects();
 }
 
