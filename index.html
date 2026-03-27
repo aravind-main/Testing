@@ -3,10 +3,71 @@
 <head>
   <title>ProjectHub</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <style>
+    body { font-family: Arial; background:#f5f6fa; }
+    h1 { margin:20px; }
+
+    .container { padding:20px; }
+
+    .card {
+      background:white;
+      padding:15px;
+      margin-bottom:10px;
+      border-radius:8px;
+      box-shadow:0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .btn {
+      padding:10px 15px;
+      background:#4f6ef7;
+      color:white;
+      border:none;
+      border-radius:5px;
+      cursor:pointer;
+      margin-bottom:15px;
+    }
+
+    input, select {
+      padding:8px;
+      margin:5px;
+    }
+
+    .form {
+      margin-bottom:20px;
+      background:white;
+      padding:15px;
+      border-radius:8px;
+    }
+  </style>
 </head>
 <body>
 
-<h1>ProjectHub</h1>
+<h1>🚀 ProjectHub</h1>
+
+<div class="container">
+
+  <!-- FORM -->
+  <div class="form">
+    <input id="name" placeholder="Project Name" />
+    <select id="status">
+      <option>Planning</option>
+      <option>Active</option>
+      <option>Review</option>
+      <option>Blocked</option>
+    </select>
+    <select id="priority">
+      <option>High</option>
+      <option>Medium</option>
+      <option>Low</option>
+    </select>
+    <input id="progress" type="number" placeholder="Progress %" />
+    <button class="btn" onclick="addProject()">Add Project</button>
+  </div>
+
+  <!-- PROJECT LIST -->
+  <div id="projects"></div>
+
+</div>
 
 <script>
 const SUPABASE_URL = "https://cdzmhgvhqrrgrjbxsncj.supabase.co";
@@ -14,36 +75,70 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function loadProjects() {
-  const { data, error } = await supabaseClient.from("projects").select("*");
+let projects = [];
+
+async function fetchProjects() {
+  const { data, error } = await supabaseClient
+    .from("projects")
+    .select("*")
+    .order("id", { ascending: true });
 
   if (error) {
     console.error(error);
     return;
   }
 
-  const container = document.createElement("div");
-
-  data.forEach(project => {
-    const card = document.createElement("div");
-    card.style.border = "1px solid #ccc";
-    card.style.padding = "10px";
-    card.style.margin = "10px";
-
-    card.innerHTML = `
-      <h3>${project.name}</h3>
-      <p>Status: ${project.status}</p>
-      <p>Priority: ${project.priority}</p>
-      <p>Progress: ${project.progress}%</p>
-    `;
-
-    container.appendChild(card);
-  });
-
-  document.body.appendChild(container);
+  projects = data;
+  renderProjects();
 }
 
-loadProjects();
+function renderProjects() {
+  const container = document.getElementById("projects");
+  container.innerHTML = "";
+
+  projects.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+      <h3>${p.name}</h3>
+      <p>Status: ${p.status}</p>
+      <p>Priority: ${p.priority}</p>
+      <p>Progress: ${p.progress}%</p>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+async function addProject() {
+  const name = document.getElementById("name").value;
+  const status = document.getElementById("status").value;
+  const priority = document.getElementById("priority").value;
+  const progress = parseInt(document.getElementById("progress").value) || 0;
+
+  if (!name) {
+    alert("Enter project name");
+    return;
+  }
+
+  const { error } = await supabaseClient.from("projects").insert([
+    { name, status, priority, progress }
+  ]);
+
+  if (error) {
+    console.error(error);
+    alert("Error saving");
+    return;
+  }
+
+  document.getElementById("name").value = "";
+  document.getElementById("progress").value = "";
+
+  fetchProjects();
+}
+
+fetchProjects();
 </script>
 
 </body>
