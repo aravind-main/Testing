@@ -12,12 +12,35 @@
 const SUPABASE_URL = "https://cdzmhgvhqrrgrjbxsncj.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkem1oZ3ZocXJyZ3JqYnhzbmNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTAwMjEsImV4cCI6MjA5MDE2NjAyMX0.3d6qERFE0RQw25EyPdaOhga1rF3aREPxBumPWjThewE";
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Example: fetch projects
 async function loadProjects() {
-  const { data, error } = await supabase.from("projects").select("*");
-  console.log(data);
+  const { data, error } = await supabaseClient.from("projects").select("*");
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  const container = document.createElement("div");
+
+  data.forEach(project => {
+    const card = document.createElement("div");
+    card.style.border = "1px solid #ccc";
+    card.style.padding = "10px";
+    card.style.margin = "10px";
+
+    card.innerHTML = `
+      <h3>${project.name}</h3>
+      <p>Status: ${project.status}</p>
+      <p>Priority: ${project.priority}</p>
+      <p>Progress: ${project.progress}%</p>
+    `;
+
+    container.appendChild(card);
+  });
+
+  document.body.appendChild(container);
 }
 
 loadProjects();
