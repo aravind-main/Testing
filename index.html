@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ProjectHub Pro+</title>
+  <title>ProjectHub</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
   <style>
-    body { margin:0; font-family: Arial; display:flex; }
+    body {
+      margin:0;
+      font-family: Arial;
+      display:flex;
+      background:#f5f6fa;
+    }
 
     .sidebar {
       width:220px;
@@ -15,39 +20,43 @@
       padding:20px;
     }
 
-    .nav-item { margin:10px 0; cursor:pointer; }
+    .nav-item {
+      margin:12px 0;
+      cursor:pointer;
+    }
 
     .main {
       flex:1;
       padding:20px;
-      background:#f5f6fa;
     }
+
+    h2 { margin-top:0; }
 
     .card {
       background:white;
       padding:15px;
       border-radius:8px;
-      margin-bottom:10px;
+      margin-bottom:12px;
       box-shadow:0 2px 6px rgba(0,0,0,0.1);
     }
 
-    .hidden { display:none; }
-
     input, select {
-      padding:6px;
+      padding:8px;
       margin:5px;
     }
 
     button {
-      padding:6px 10px;
+      padding:8px 12px;
       border:none;
+      border-radius:5px;
       background:#4f6ef7;
       color:white;
-      border-radius:4px;
       cursor:pointer;
     }
 
     .delete { background:red; }
+
+    .hidden { display:none; }
 
     .kanban {
       display:flex;
@@ -59,7 +68,10 @@
       background:#e5e7eb;
       padding:10px;
       border-radius:6px;
+      min-height:200px;
     }
+
+    a { color:#4f6ef7; }
   </style>
 </head>
 
@@ -70,7 +82,6 @@
   <div class="nav-item" onclick="showView('dashboard')">Dashboard</div>
   <div class="nav-item" onclick="showView('projects')">Projects</div>
   <div class="nav-item" onclick="showView('kanban')">Kanban</div>
-  <div class="nav-item" onclick="showView('docs')">Documents</div>
 </div>
 
 <div class="main">
@@ -85,26 +96,29 @@
   <div id="projects" class="hidden">
     <h2>Projects</h2>
 
-    <input id="name" placeholder="Name">
-    <input id="dept" placeholder="Department">
+    <div class="card">
+      <input id="name" placeholder="Project Name">
+      <input id="dept" placeholder="Department">
 
-    <select id="status">
-      <option>Planning</option>
-      <option>Active</option>
-      <option>Review</option>
-      <option>Blocked</option>
-      <option>Completed</option>
-    </select>
+      <select id="status">
+        <option>Planning</option>
+        <option>Active</option>
+        <option>Review</option>
+        <option>Blocked</option>
+        <option>Completed</option>
+      </select>
 
-    <select id="priority">
-      <option>High</option>
-      <option>Medium</option>
-      <option>Low</option>
-    </select>
+      <select id="priority">
+        <option>High</option>
+        <option>Medium</option>
+        <option>Low</option>
+      </select>
 
-    <input id="progress" type="number" placeholder="Progress %">
+      <input id="progress" type="number" placeholder="Progress %">
+      <input id="doc" placeholder="Google Sheet / Doc link">
 
-    <button onclick="addProject()">Add</button>
+      <button onclick="addProject()">Add Project</button>
+    </div>
 
     <div id="projectList"></div>
   </div>
@@ -121,47 +135,46 @@
     </div>
   </div>
 
-  <!-- DOCUMENTS -->
-  <div id="docs" class="hidden">
-    <h2>Documents</h2>
-
-    <input type="file" id="fileInput">
-    <button onclick="uploadFile()">Upload</button>
-
-    <div id="fileList"></div>
-  </div>
-
 </div>
 
 <script>
-const supabaseClient = supabase.createClient(
+const db = supabase.createClient(
   "https://cdzmhgvhqrrgrjbxsncj.supabase.co",
-  "YOUR_KEY"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkem1oZ3ZocXJyZ3JqYnhzbmNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTAwMjEsImV4cCI6MjA5MDE2NjAyMX0.3d6qERFE0RQw25EyPdaOhga1rF3aREPxBumPWjThewE"
 );
 
 let projects = [];
 
 /* NAVIGATION */
 function showView(v) {
-  ["dashboard","projects","kanban","docs"].forEach(id=>{
+  ["dashboard","projects","kanban"].forEach(id=>{
     document.getElementById(id).classList.add("hidden");
   });
   document.getElementById(v).classList.remove("hidden");
-
-  if(v === "docs") loadFiles();
 }
 
-/* LOAD PROJECTS */
+/* LOAD DATA */
 async function loadProjects() {
-  const { data } = await supabaseClient.from("projects").select("*");
+  const { data, error } = await db.from("projects").select("*");
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
   projects = data;
   renderAll();
 }
 
 /* DASHBOARD */
 function renderStats() {
-  document.getElementById("stats").innerHTML =
-    `<div class="card">Total Projects: ${projects.length}</div>`;
+  const total = projects.length;
+  const active = projects.filter(p=>p.status==="Active").length;
+
+  document.getElementById("stats").innerHTML = `
+    <div class="card">Total Projects: ${total}</div>
+    <div class="card">Active Projects: ${active}</div>
+  `;
 }
 
 /* PROJECT LIST */
@@ -172,11 +185,23 @@ function renderProjects() {
   projects.forEach(p=>{
     list.innerHTML += `
       <div class="card">
-        <b>${p.name}</b><br>
-        ${p.dept}<br>
-        ${p.status} | ${p.priority} | ${p.progress}%<br>
+        <h3>${p.name}</h3>
+        Dept: ${p.dept}<br>
 
-        <button onclick="deleteProject(${p.id})">Delete</button>
+        Status:
+        <select onchange="updateStatus(${p.id}, this.value)">
+          ${["Planning","Active","Review","Blocked","Completed"]
+            .map(s => `<option ${p.status===s?"selected":""}>${s}</option>`)
+            .join("")}
+        </select><br>
+
+        Priority: ${p.priority}<br>
+        Progress: ${p.progress}%<br>
+
+        ${p.doc_link ? `<a href="${p.doc_link}" target="_blank">📎 Open Document</a><br>` : ""}
+
+        <button onclick="editProject(${p.id})">Edit</button>
+        <button class="delete" onclick="deleteProject(${p.id})">Delete</button>
       </div>
     `;
   });
@@ -194,14 +219,15 @@ function renderKanban() {
   });
 }
 
-/* ADD PROJECT */
+/* ADD */
 async function addProject() {
-  await supabaseClient.from("projects").insert([{
+  await db.from("projects").insert([{
     name: name.value,
     dept: dept.value,
     status: status.value,
     priority: priority.value,
-    progress: parseInt(progress.value)||0
+    progress: parseInt(progress.value)||0,
+    doc_link: doc.value
   }]);
 
   loadProjects();
@@ -209,46 +235,26 @@ async function addProject() {
 
 /* DELETE */
 async function deleteProject(id) {
-  await supabaseClient.from("projects").delete().eq("id", id);
+  await db.from("projects").delete().eq("id", id);
   loadProjects();
 }
 
-/* FILE UPLOAD */
-async function uploadFile() {
-  const file = document.getElementById("fileInput").files[0];
-  if(!file) return;
-
-  const { error } = await supabaseClient.storage
-    .from("documents")
-    .upload(file.name, file);
-
-  if(error) alert("Upload failed");
-  else loadFiles();
+/* STATUS UPDATE */
+async function updateStatus(id, status) {
+  await db.from("projects").update({ status }).eq("id", id);
+  loadProjects();
 }
 
-/* LOAD FILES */
-async function loadFiles() {
-  const { data } = await supabaseClient.storage
-    .from("documents")
-    .list();
+/* EDIT */
+async function editProject(id) {
+  const newName = prompt("New name:");
+  if (!newName) return;
 
-  const list = document.getElementById("fileList");
-  list.innerHTML = "";
-
-  data.forEach(f=>{
-    const url = supabaseClient.storage
-      .from("documents")
-      .getPublicUrl(f.name).data.publicUrl;
-
-    list.innerHTML += `
-      <div class="card">
-        <a href="${url}" target="_blank">${f.name}</a>
-      </div>
-    `;
-  });
+  await db.from("projects").update({ name: newName }).eq("id", id);
+  loadProjects();
 }
 
-/* RENDER ALL */
+/* RENDER */
 function renderAll() {
   renderStats();
   renderProjects();
