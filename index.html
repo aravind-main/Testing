@@ -5,7 +5,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
   <style>
-    body { margin:0; font-family:Arial; display:flex; }
+    body { margin:0; font-family: Arial; display:flex; }
 
     .sidebar {
       width:220px;
@@ -15,12 +15,7 @@
       padding:20px;
     }
 
-    .sidebar h2 { margin-bottom:20px; }
-
-    .nav-item {
-      margin:10px 0;
-      cursor:pointer;
-    }
+    .nav-item { margin:10px 0; cursor:pointer; }
 
     .main {
       flex:1;
@@ -33,9 +28,15 @@
       padding:15px;
       border-radius:8px;
       margin-bottom:10px;
+      box-shadow:0 2px 6px rgba(0,0,0,0.1);
     }
 
     .hidden { display:none; }
+
+    input, select {
+      padding:6px;
+      margin:5px;
+    }
 
     button {
       padding:6px 10px;
@@ -47,6 +48,18 @@
     }
 
     .delete { background:red; }
+
+    .kanban {
+      display:flex;
+      gap:10px;
+    }
+
+    .column {
+      flex:1;
+      background:#e5e7eb;
+      padding:10px;
+      border-radius:6px;
+    }
   </style>
 </head>
 
@@ -71,7 +84,22 @@
   <div id="projects" class="hidden">
     <h2>Projects</h2>
 
-    <input id="name" placeholder="Project name">
+    <input id="name" placeholder="Name">
+    <input id="dept" placeholder="Department">
+    <select id="status">
+      <option>Planning</option>
+      <option>Active</option>
+      <option>Review</option>
+      <option>Blocked</option>
+      <option>Completed</option>
+    </select>
+    <select id="priority">
+      <option>High</option>
+      <option>Medium</option>
+      <option>Low</option>
+    </select>
+    <input id="progress" placeholder="Progress %" type="number">
+
     <button onclick="addProject()">Add</button>
 
     <div id="projectList"></div>
@@ -80,11 +108,12 @@
   <!-- KANBAN -->
   <div id="kanban" class="hidden">
     <h2>Kanban</h2>
-    <div style="display:flex; gap:10px;">
-      <div><h3>Planning</h3><div id="col-planning"></div></div>
-      <div><h3>Active</h3><div id="col-active"></div></div>
-      <div><h3>Review</h3><div id="col-review"></div></div>
-      <div><h3>Blocked</h3><div id="col-blocked"></div></div>
+    <div class="kanban">
+      <div class="column"><h3>Planning</h3><div id="Planning"></div></div>
+      <div class="column"><h3>Active</h3><div id="Active"></div></div>
+      <div class="column"><h3>Review</h3><div id="Review"></div></div>
+      <div class="column"><h3>Blocked</h3><div id="Blocked"></div></div>
+      <div class="column"><h3>Completed</h3><div id="Completed"></div></div>
     </div>
   </div>
 
@@ -93,11 +122,12 @@
 <script>
 const db = supabase.createClient(
   "https://cdzmhgvhqrrgrjbxsncj.supabase.co",
-  "YOUR_KEY"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkem1oZ3ZocXJyZ3JqYnhzbmNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTAwMjEsImV4cCI6MjA5MDE2NjAyMX0.3d6qERFE0RQw25EyPdaOhga1rF3aREPxBumPWjThewE"
 );
 
 let projects = [];
 
+/* NAVIGATION */
 function showView(v) {
   ["dashboard","projects","kanban"].forEach(id=>{
     document.getElementById(id).classList.add("hidden");
@@ -105,9 +135,15 @@ function showView(v) {
   document.getElementById(v).classList.remove("hidden");
 }
 
-/* LOAD */
+/* LOAD DATA */
 async function loadProjects() {
-  const { data } = await db.from("projects").select("*");
+  const { data, error } = await db.from("projects").select("*");
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
   projects = data;
   renderAll();
 }
@@ -118,7 +154,7 @@ function renderStats() {
   const active = projects.filter(p=>p.status==="Active").length;
 
   document.getElementById("stats").innerHTML = `
-    <div class="card">Total: ${total}</div>
+    <div class="card">Total Projects: ${total}</div>
     <div class="card">Active: ${active}</div>
   `;
 }
@@ -134,9 +170,18 @@ function renderProjects() {
 
     div.innerHTML = `
       <b>${p.name}</b><br>
-      Status: ${p.status}<br>
+      Dept: ${p.dept}<br>
+      Status: 
+      <select onchange="updateStatus(${p.id}, this.value)">
+        ${["Planning","Active","Review","Blocked","Completed"].map(s =>
+          `<option ${p.status===s?"selected":""}>${s}</option>`
+        ).join("")}
+      </select><br>
+      Priority: ${p.priority}<br>
+      Progress: ${p.progress}%<br>
 
-      <button onclick="deleteProject(${p.id})">Delete</button>
+      <button onclick="editProject(${p.id})">Edit</button>
+      <button class="delete" onclick="deleteProject(${p.id})">Delete</button>
     `;
 
     list.appendChild(div);
@@ -145,33 +190,53 @@ function renderProjects() {
 
 /* KANBAN */
 function renderKanban() {
-  ["planning","active","review","blocked"].forEach(c=>{
-    document.getElementById("col-"+c).innerHTML = "";
+  ["Planning","Active","Review","Blocked","Completed"].forEach(s=>{
+    document.getElementById(s).innerHTML = "";
   });
 
   projects.forEach(p=>{
-    const col = "col-"+p.status.toLowerCase();
-
     const div = document.createElement("div");
     div.className = "card";
     div.innerText = p.name;
 
-    document.getElementById(col).appendChild(div);
+    document.getElementById(p.status).appendChild(div);
   });
 }
 
 /* ADD */
 async function addProject() {
   const name = document.getElementById("name").value;
-  if (!name) return;
+  if (!name) return alert("Enter name");
 
-  await db.from("projects").insert([{ name, status:"Planning" }]);
+  await db.from("projects").insert([{
+    name,
+    dept: document.getElementById("dept").value,
+    status: document.getElementById("status").value,
+    priority: document.getElementById("priority").value,
+    progress: parseInt(document.getElementById("progress").value) || 0
+  }]);
+
   loadProjects();
 }
 
 /* DELETE */
 async function deleteProject(id) {
   await db.from("projects").delete().eq("id", id);
+  loadProjects();
+}
+
+/* UPDATE STATUS */
+async function updateStatus(id, status) {
+  await db.from("projects").update({ status }).eq("id", id);
+  loadProjects();
+}
+
+/* EDIT */
+async function editProject(id) {
+  const name = prompt("New name:");
+  if (!name) return;
+
+  await db.from("projects").update({ name }).eq("id", id);
   loadProjects();
 }
 
