@@ -5,173 +5,167 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
   <style>
-    body { margin:0; font-family: Arial; background:#f5f6fa; }
+    body { margin:0; font-family:Arial; display:flex; }
 
-    header {
-      background:#4f6ef7;
+    .sidebar {
+      width:220px;
+      background:#111827;
       color:white;
-      padding:15px 25px;
-      font-size:20px;
-      font-weight:bold;
-    }
-
-    .container {
-      max-width:1000px;
-      margin:auto;
+      height:100vh;
       padding:20px;
     }
 
-    .form {
-      background:white;
-      padding:15px;
-      border-radius:10px;
-      margin-bottom:20px;
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-    }
+    .sidebar h2 { margin-bottom:20px; }
 
-    input, select {
-      padding:8px;
-    }
-
-    button {
-      padding:8px 12px;
-      border:none;
-      border-radius:6px;
-      background:#4f6ef7;
-      color:white;
+    .nav-item {
+      margin:10px 0;
       cursor:pointer;
     }
 
-    .delete { background:red; }
+    .main {
+      flex:1;
+      padding:20px;
+      background:#f5f6fa;
+    }
 
     .card {
       background:white;
       padding:15px;
-      border-radius:10px;
-      margin-bottom:12px;
-      box-shadow:0 2px 8px rgba(0,0,0,0.1);
+      border-radius:8px;
+      margin-bottom:10px;
     }
 
-    .actions {
-      margin-top:10px;
-      display:flex;
-      gap:10px;
+    .hidden { display:none; }
+
+    button {
+      padding:6px 10px;
+      border:none;
+      background:#4f6ef7;
+      color:white;
+      border-radius:4px;
+      cursor:pointer;
     }
+
+    .delete { background:red; }
   </style>
 </head>
 
 <body>
 
-<header>🚀 ProjectHub Pro (Cloud)</header>
+<div class="sidebar">
+  <h2>🚀 ProjectHub</h2>
+  <div class="nav-item" onclick="showView('dashboard')">Dashboard</div>
+  <div class="nav-item" onclick="showView('projects')">Projects</div>
+  <div class="nav-item" onclick="showView('kanban')">Kanban</div>
+</div>
 
-<div class="container">
+<div class="main">
 
-  <!-- FORM -->
-  <div class="form">
-    <input id="name" placeholder="Project Name">
-    
-    <select id="status">
-      <option>Planning</option>
-      <option>Active</option>
-      <option>Review</option>
-      <option>Blocked</option>
-    </select>
-
-    <select id="priority">
-      <option>High</option>
-      <option>Medium</option>
-      <option>Low</option>
-    </select>
-
-    <input id="progress" type="number" placeholder="Progress %">
-
-    <button onclick="addProject()">Add</button>
+  <!-- DASHBOARD -->
+  <div id="dashboard">
+    <h2>Dashboard</h2>
+    <div id="stats"></div>
   </div>
 
   <!-- PROJECTS -->
-  <div id="projects"></div>
+  <div id="projects" class="hidden">
+    <h2>Projects</h2>
+
+    <input id="name" placeholder="Project name">
+    <button onclick="addProject()">Add</button>
+
+    <div id="projectList"></div>
+  </div>
+
+  <!-- KANBAN -->
+  <div id="kanban" class="hidden">
+    <h2>Kanban</h2>
+    <div style="display:flex; gap:10px;">
+      <div><h3>Planning</h3><div id="col-planning"></div></div>
+      <div><h3>Active</h3><div id="col-active"></div></div>
+      <div><h3>Review</h3><div id="col-review"></div></div>
+      <div><h3>Blocked</h3><div id="col-blocked"></div></div>
+    </div>
+  </div>
 
 </div>
 
 <script>
-const SUPABASE_URL = "https://cdzmhgvhqrrgrjbxsncj.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkem1oZ3ZocXJyZ3JqYnhzbmNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTAwMjEsImV4cCI6MjA5MDE2NjAyMX0.3d6qERFE0RQw25EyPdaOhga1rF3aREPxBumPWjThewE";
-
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const db = supabase.createClient(
+  "https://cdzmhgvhqrrgrjbxsncj.supabase.co",
+  "YOUR_KEY"
+);
 
 let projects = [];
 
-/* LOAD */
-async function loadProjects() {
-  const { data, error } = await db.from("projects").select("*").order("id");
-
-  if (error) {
-    console.error(error);
-    return;
-  }
-
-  projects = data;
-  render();
+function showView(v) {
+  ["dashboard","projects","kanban"].forEach(id=>{
+    document.getElementById(id).classList.add("hidden");
+  });
+  document.getElementById(v).classList.remove("hidden");
 }
 
-/* RENDER */
-function render() {
-  const container = document.getElementById("projects");
-  container.innerHTML = "";
+/* LOAD */
+async function loadProjects() {
+  const { data } = await db.from("projects").select("*");
+  projects = data;
+  renderAll();
+}
 
-  projects.forEach(p => {
+/* DASHBOARD */
+function renderStats() {
+  const total = projects.length;
+  const active = projects.filter(p=>p.status==="Active").length;
+
+  document.getElementById("stats").innerHTML = `
+    <div class="card">Total: ${total}</div>
+    <div class="card">Active: ${active}</div>
+  `;
+}
+
+/* PROJECT LIST */
+function renderProjects() {
+  const list = document.getElementById("projectList");
+  list.innerHTML = "";
+
+  projects.forEach(p=>{
     const div = document.createElement("div");
     div.className = "card";
 
     div.innerHTML = `
-      <h3>${p.name}</h3>
+      <b>${p.name}</b><br>
+      Status: ${p.status}<br>
 
-      <p>Status:
-        <select onchange="updateStatus(${p.id}, this.value)">
-          <option ${p.status==="Planning"?"selected":""}>Planning</option>
-          <option ${p.status==="Active"?"selected":""}>Active</option>
-          <option ${p.status==="Review"?"selected":""}>Review</option>
-          <option ${p.status==="Blocked"?"selected":""}>Blocked</option>
-        </select>
-      </p>
-
-      <p>Priority: ${p.priority}</p>
-      <p>Progress: ${p.progress}%</p>
-
-      <div class="actions">
-        <button onclick="editProject(${p.id})">Edit</button>
-        <button class="delete" onclick="deleteProject(${p.id})">Delete</button>
-      </div>
+      <button onclick="deleteProject(${p.id})">Delete</button>
     `;
 
-    container.appendChild(div);
+    list.appendChild(div);
+  });
+}
+
+/* KANBAN */
+function renderKanban() {
+  ["planning","active","review","blocked"].forEach(c=>{
+    document.getElementById("col-"+c).innerHTML = "";
+  });
+
+  projects.forEach(p=>{
+    const col = "col-"+p.status.toLowerCase();
+
+    const div = document.createElement("div");
+    div.className = "card";
+    div.innerText = p.name;
+
+    document.getElementById(col).appendChild(div);
   });
 }
 
 /* ADD */
 async function addProject() {
   const name = document.getElementById("name").value;
-  const status = document.getElementById("status").value;
-  const priority = document.getElementById("priority").value;
-  const progress = parseInt(document.getElementById("progress").value) || 0;
+  if (!name) return;
 
-  if (!name) return alert("Enter name");
-
-  const { error } = await db.from("projects").insert([
-    { name, status, priority, progress }
-  ]);
-
-  if (error) {
-    console.error(error);
-    alert("Error saving");
-    return;
-  }
-
-  document.getElementById("name").value = "";
-  document.getElementById("progress").value = "";
-
+  await db.from("projects").insert([{ name, status:"Planning" }]);
   loadProjects();
 }
 
@@ -181,18 +175,11 @@ async function deleteProject(id) {
   loadProjects();
 }
 
-/* UPDATE STATUS */
-async function updateStatus(id, status) {
-  await db.from("projects").update({ status }).eq("id", id);
-}
-
-/* EDIT */
-async function editProject(id) {
-  const newName = prompt("Enter new name:");
-  if (!newName) return;
-
-  await db.from("projects").update({ name: newName }).eq("id", id);
-  loadProjects();
+/* RENDER ALL */
+function renderAll() {
+  renderStats();
+  renderProjects();
+  renderKanban();
 }
 
 loadProjects();
