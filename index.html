@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ProjectHub Pro</title>
+  <title>ProjectHub Pro+</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
   <style>
@@ -70,6 +70,7 @@
   <div class="nav-item" onclick="showView('dashboard')">Dashboard</div>
   <div class="nav-item" onclick="showView('projects')">Projects</div>
   <div class="nav-item" onclick="showView('kanban')">Kanban</div>
+  <div class="nav-item" onclick="showView('docs')">Documents</div>
 </div>
 
 <div class="main">
@@ -86,6 +87,7 @@
 
     <input id="name" placeholder="Name">
     <input id="dept" placeholder="Department">
+
     <select id="status">
       <option>Planning</option>
       <option>Active</option>
@@ -93,12 +95,14 @@
       <option>Blocked</option>
       <option>Completed</option>
     </select>
+
     <select id="priority">
       <option>High</option>
       <option>Medium</option>
       <option>Low</option>
     </select>
-    <input id="progress" placeholder="Progress %" type="number">
+
+    <input id="progress" type="number" placeholder="Progress %">
 
     <button onclick="addProject()">Add</button>
 
@@ -117,46 +121,47 @@
     </div>
   </div>
 
+  <!-- DOCUMENTS -->
+  <div id="docs" class="hidden">
+    <h2>Documents</h2>
+
+    <input type="file" id="fileInput">
+    <button onclick="uploadFile()">Upload</button>
+
+    <div id="fileList"></div>
+  </div>
+
 </div>
 
 <script>
-const db = supabase.createClient(
+const supabaseClient = supabase.createClient(
   "https://cdzmhgvhqrrgrjbxsncj.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkem1oZ3ZocXJyZ3JqYnhzbmNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTAwMjEsImV4cCI6MjA5MDE2NjAyMX0.3d6qERFE0RQw25EyPdaOhga1rF3aREPxBumPWjThewE"
+  "YOUR_KEY"
 );
 
 let projects = [];
 
 /* NAVIGATION */
 function showView(v) {
-  ["dashboard","projects","kanban"].forEach(id=>{
+  ["dashboard","projects","kanban","docs"].forEach(id=>{
     document.getElementById(id).classList.add("hidden");
   });
   document.getElementById(v).classList.remove("hidden");
+
+  if(v === "docs") loadFiles();
 }
 
-/* LOAD DATA */
+/* LOAD PROJECTS */
 async function loadProjects() {
-  const { data, error } = await db.from("projects").select("*");
-
-  if (error) {
-    console.error(error);
-    return;
-  }
-
+  const { data } = await supabaseClient.from("projects").select("*");
   projects = data;
   renderAll();
 }
 
 /* DASHBOARD */
 function renderStats() {
-  const total = projects.length;
-  const active = projects.filter(p=>p.status==="Active").length;
-
-  document.getElementById("stats").innerHTML = `
-    <div class="card">Total Projects: ${total}</div>
-    <div class="card">Active: ${active}</div>
-  `;
+  document.getElementById("stats").innerHTML =
+    `<div class="card">Total Projects: ${projects.length}</div>`;
 }
 
 /* PROJECT LIST */
@@ -165,55 +170,38 @@ function renderProjects() {
   list.innerHTML = "";
 
   projects.forEach(p=>{
-    const div = document.createElement("div");
-    div.className = "card";
+    list.innerHTML += `
+      <div class="card">
+        <b>${p.name}</b><br>
+        ${p.dept}<br>
+        ${p.status} | ${p.priority} | ${p.progress}%<br>
 
-    div.innerHTML = `
-      <b>${p.name}</b><br>
-      Dept: ${p.dept}<br>
-      Status: 
-      <select onchange="updateStatus(${p.id}, this.value)">
-        ${["Planning","Active","Review","Blocked","Completed"].map(s =>
-          `<option ${p.status===s?"selected":""}>${s}</option>`
-        ).join("")}
-      </select><br>
-      Priority: ${p.priority}<br>
-      Progress: ${p.progress}%<br>
-
-      <button onclick="editProject(${p.id})">Edit</button>
-      <button class="delete" onclick="deleteProject(${p.id})">Delete</button>
+        <button onclick="deleteProject(${p.id})">Delete</button>
+      </div>
     `;
-
-    list.appendChild(div);
   });
 }
 
 /* KANBAN */
 function renderKanban() {
   ["Planning","Active","Review","Blocked","Completed"].forEach(s=>{
-    document.getElementById(s).innerHTML = "";
+    document.getElementById(s).innerHTML="";
   });
 
   projects.forEach(p=>{
-    const div = document.createElement("div");
-    div.className = "card";
-    div.innerText = p.name;
-
-    document.getElementById(p.status).appendChild(div);
+    document.getElementById(p.status).innerHTML +=
+      `<div class="card">${p.name}</div>`;
   });
 }
 
-/* ADD */
+/* ADD PROJECT */
 async function addProject() {
-  const name = document.getElementById("name").value;
-  if (!name) return alert("Enter name");
-
-  await db.from("projects").insert([{
-    name,
-    dept: document.getElementById("dept").value,
-    status: document.getElementById("status").value,
-    priority: document.getElementById("priority").value,
-    progress: parseInt(document.getElementById("progress").value) || 0
+  await supabaseClient.from("projects").insert([{
+    name: name.value,
+    dept: dept.value,
+    status: status.value,
+    priority: priority.value,
+    progress: parseInt(progress.value)||0
   }]);
 
   loadProjects();
@@ -221,23 +209,43 @@ async function addProject() {
 
 /* DELETE */
 async function deleteProject(id) {
-  await db.from("projects").delete().eq("id", id);
+  await supabaseClient.from("projects").delete().eq("id", id);
   loadProjects();
 }
 
-/* UPDATE STATUS */
-async function updateStatus(id, status) {
-  await db.from("projects").update({ status }).eq("id", id);
-  loadProjects();
+/* FILE UPLOAD */
+async function uploadFile() {
+  const file = document.getElementById("fileInput").files[0];
+  if(!file) return;
+
+  const { error } = await supabaseClient.storage
+    .from("documents")
+    .upload(file.name, file);
+
+  if(error) alert("Upload failed");
+  else loadFiles();
 }
 
-/* EDIT */
-async function editProject(id) {
-  const name = prompt("New name:");
-  if (!name) return;
+/* LOAD FILES */
+async function loadFiles() {
+  const { data } = await supabaseClient.storage
+    .from("documents")
+    .list();
 
-  await db.from("projects").update({ name }).eq("id", id);
-  loadProjects();
+  const list = document.getElementById("fileList");
+  list.innerHTML = "";
+
+  data.forEach(f=>{
+    const url = supabaseClient.storage
+      .from("documents")
+      .getPublicUrl(f.name).data.publicUrl;
+
+    list.innerHTML += `
+      <div class="card">
+        <a href="${url}" target="_blank">${f.name}</a>
+      </div>
+    `;
+  });
 }
 
 /* RENDER ALL */
